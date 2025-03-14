@@ -78,10 +78,17 @@
         </v-btn>
         <v-btn
           color="warning"
-          @click="editUser"
+          @click="showEditDialog = true"
           class="ml-2"
         >
           Edit
+        </v-btn>
+        <v-btn
+          color="error"
+          @click="dialogDelete = true"
+          class="ml-2"
+        >
+          Delete
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -112,18 +119,60 @@
         </v-btn>
       </v-card-actions>
     </v-card>
+    
+    <!-- Dialog to confirm deletion -->
+    <v-dialog
+      v-model="dialogDelete"
+      max-width="500px"
+    >
+      <v-card>
+        <v-card-title class="text-h5">Are you sure you want to delete this user?</v-card-title>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn
+            color="blue darken-1"
+            text
+            @click="dialogDelete = false"
+          >
+            Cancel
+          </v-btn>
+          <v-btn
+            color="red darken-1"
+            text
+            @click="deleteUserConfirm"
+          >
+            Confirm
+          </v-btn>
+          <v-spacer></v-spacer>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+    
+    <!-- Edit User Dialog -->
+    <edit-user-dialog
+      v-if="showEditDialog"
+      :user="user"
+      @close="showEditDialog = false"
+      @refresh="fetchUser"
+    />
   </v-container>
 </template>
 
 <script>
 import apiClient from '../api/config'
+import EditUserDialog from '../components/EditUserDialog.vue'
 
 export default {
   name: 'UserDetails',
+  components: {
+    EditUserDialog
+  },
   data: () => ({
     user: null,
     loading: true,
-    error: null
+    error: null,
+    dialogDelete: false,
+    showEditDialog: false
   }),
   
   mounted() {
@@ -159,11 +208,24 @@ export default {
     },
     
     editUser() {
-      this.$router.push({ 
-        name: 'Users',
-        query: { edit: this.user._id }
-      })
+      this.showEditDialog = true
+    },
+    
+    async deleteUserConfirm() {
+      try {
+        await apiClient.delete(`/users/${this.user._id}`)
+        this.$router.push({ name: 'Users' })
+      } catch (error) {
+        console.error('Error deleting user:', error)
+      }
+      this.dialogDelete = false
     }
   }
 }
-</script> 
+</script>
+
+<style>
+.clickable-chip {
+  cursor: pointer;
+}
+</style> 

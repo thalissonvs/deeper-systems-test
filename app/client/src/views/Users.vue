@@ -21,6 +21,15 @@
         class="elevation-1"
         item-value="_id"
       >
+        <template #[`item.username`]="props">
+          <a 
+            @click="viewUser(props.item)" 
+            class="clickable-username"
+          >
+            {{ props.item.username }}
+          </a>
+        </template>
+        
         <template #[`item.active`]="props">
           <v-chip
             :color="props.item.active ? 'green' : 'red'"
@@ -33,13 +42,6 @@
         
         <template #[`item.actions`]="props">
           <div class="d-flex">
-            <v-icon
-              size="small"
-              class="mr-2"
-              @click="viewUser(props.item)"
-            >
-              mdi-eye
-            </v-icon>
             <v-icon
               size="small"
               class="mr-2"
@@ -67,7 +69,7 @@
       </v-card-actions>
     </v-card>
     
-    <!-- Dialog for adding/editing user -->
+    <!-- Dialog for adding/editing user form -->
     <v-dialog
       v-model="dialog"
       max-width="500px"
@@ -130,10 +132,41 @@
           <v-btn
             color="blue darken-1"
             text
-            @click="save"
+            @click="dialogConfirmEdit = true"
           >
             Save
           </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+    
+    <!-- Dialog to confirm edit -->
+    <v-dialog
+      v-model="dialogConfirmEdit"
+      max-width="500px"
+    >
+      <v-card>
+        <v-card-title class="text-h5">Confirm User Changes</v-card-title>
+        <v-card-text>
+          Are you sure you want to save these changes?
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn
+            color="blue darken-1"
+            text
+            @click="dialogConfirmEdit = false"
+          >
+            Cancel
+          </v-btn>
+          <v-btn
+            color="green darken-1"
+            text
+            @click="confirmEdit"
+          >
+            Confirm
+          </v-btn>
+          <v-spacer></v-spacer>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -178,6 +211,7 @@ export default {
     loading: false,
     dialog: false,
     dialogDelete: false,
+    dialogConfirmEdit: false,
     editMode: false,
     headers: [
       { title: 'Username', align: 'start', sortable: true, key: 'username' },
@@ -218,6 +252,10 @@ export default {
   
   mounted() {
     this.fetchUsers()
+    // Check if we need to edit a user based on query param
+    if (this.$route.query.edit) {
+      this.editUserById(this.$route.query.edit)
+    }
   },
   
   methods: {
@@ -290,6 +328,11 @@ export default {
       this.closeDelete()
     },
     
+    async confirmEdit() {
+      await this.save()
+      this.dialogConfirmEdit = false
+    },
+    
     async save() {
       if (this.editedIndex > -1) {
         // Editing existing user
@@ -347,7 +390,42 @@ export default {
         this.editedItem = Object.assign({}, this.defaultItem)
         this.editedIndex = -1
       })
+    },
+    
+    async editUserById(userId) {
+      try {
+        const response = await apiClient.get(`/users/${userId}`)
+        const user = response.data
+        
+        // Add formatted fields to match the table format
+        const preferences = user.preferences || { timezone: 'UTC' };
+        const formattedUser = {
+          ...user,
+          rolesAsString: (user.roles || []).join(', '),
+          created_ts_formatted: this.formatDate(user.created_ts),
+          updated_ts_formatted: this.formatDate(user.updated_ts || user.created_ts),
+          timezone: preferences.timezone || 'UTC',
+          preferences: preferences
+        }
+        
+        this.editedItem = Object.assign({}, formattedUser)
+        this.editMode = true
+        this.dialog = true
+      } catch (error) {
+        console.error('Error loading user for edit:', error)
+      }
     }
   }
 }
-</script> 
+</script>
+
+<style>
+.clickable-username {
+  color: #1976d2;
+  text-decoration: none;
+  cursor: pointer;
+}
+.clickable-username:hover {
+  text-decoration: underline;
+}
+</style> 

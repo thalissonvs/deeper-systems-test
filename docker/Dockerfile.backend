@@ -12,7 +12,7 @@ RUN pip install poetry && \
     poetry install --without dev
 
 
-COPY settings.py ./
+COPY app/settings.py ./
 COPY app/ ./app/
 COPY udata.json ./udata.json
 

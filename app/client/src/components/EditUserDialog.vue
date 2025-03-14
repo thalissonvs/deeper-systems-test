@@ -94,6 +94,7 @@
 </template>
 
 <script>
+import { ref, reactive, watch } from 'vue'
 import apiClient from '../api/config'
 
 export default {
@@ -104,48 +105,56 @@ export default {
       required: true
     }
   },
-  data() {
-    return {
-      dialog: true,
-      dialogConfirmEdit: false,
-      editedItem: {
-        username: '',
-        roles: [],
-        preferences: {
-          timezone: 'UTC'
-        },
-        active: true
-      }
-    }
-  },
-  watch: {
-    user: {
-      handler(newValue) {
-        if (newValue) {
-          this.editedItem = Object.assign({}, newValue)
-          // Ensure preferences object exists
-          if (!this.editedItem.preferences) {
-            this.editedItem.preferences = { timezone: 'UTC' }
-          }
-        }
+  setup(props, { emit }) {
+    // Reactive state
+    const dialog = ref(true)
+    const dialogConfirmEdit = ref(false)
+    const editedItem = reactive({
+      username: '',
+      roles: [],
+      preferences: {
+        timezone: 'UTC'
       },
-      immediate: true
+      active: true
+    })
+
+    // Watch for changes in the user prop
+    watch(() => props.user, (newValue) => {
+      if (newValue) {
+        // Copy user data to editedItem
+        Object.assign(editedItem, JSON.parse(JSON.stringify(newValue)))
+        
+        // Ensure preferences object exists
+        if (!editedItem.preferences) {
+          editedItem.preferences = { timezone: 'UTC' }
+        }
+      }
+    }, { immediate: true })
+
+    // Methods
+    const close = () => {
+      dialog.value = false
+      emit('close')
     }
-  },
-  methods: {
-    close() {
-      this.dialog = false
-      this.$emit('close')
-    },
-    async confirmEdit() {
+
+    const confirmEdit = async () => {
       try {
-        await apiClient.put(`/users/${this.editedItem._id}`, this.editedItem)
-        this.$emit('refresh')
-        this.dialogConfirmEdit = false
-        this.close()
+        await apiClient.put(`/users/${editedItem._id}`, editedItem)
+        emit('refresh')
+        dialogConfirmEdit.value = false
+        close()
       } catch (error) {
         console.error('Error updating user:', error)
       }
+    }
+
+    // Expose to template
+    return {
+      dialog,
+      dialogConfirmEdit,
+      editedItem,
+      close,
+      confirmEdit
     }
   }
 }

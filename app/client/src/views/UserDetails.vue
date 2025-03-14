@@ -6,7 +6,7 @@
         <v-spacer></v-spacer>
         <v-btn
           icon
-          @click="$router.go(-1)"
+          @click="router.go(-1)"
         >
           <v-icon>mdi-arrow-left</v-icon>
         </v-btn>
@@ -72,7 +72,7 @@
         <v-spacer></v-spacer>
         <v-btn
           color="primary"
-          @click="$router.push({ name: 'Users' })"
+          @click="router.push({ name: 'Users' })"
         >
           Back to List
         </v-btn>
@@ -113,7 +113,7 @@
         <v-spacer></v-spacer>
         <v-btn
           color="primary"
-          @click="$router.push({ name: 'Users' })"
+          @click="router.push({ name: 'Users' })"
         >
           Back to List
         </v-btn>
@@ -159,6 +159,8 @@
 </template>
 
 <script>
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import apiClient from '../api/config'
 import EditUserDialog from '../components/EditUserDialog.vue'
 
@@ -167,34 +169,34 @@ export default {
   components: {
     EditUserDialog
   },
-  data: () => ({
-    user: null,
-    loading: true,
-    error: null,
-    dialogDelete: false,
-    showEditDialog: false
-  }),
-  
-  mounted() {
-    this.fetchUser()
-  },
-  
-  methods: {
-    async fetchUser() {
-      this.loading = true
-      try {
-        const userId = this.$route.params.id
-        const response = await apiClient.get(`/users/${userId}`)
-        this.user = response.data
-      } catch (error) {
-        this.error = 'Error loading user'
-        console.error(this.error, error)
-      } finally {
-        this.loading = false
-      }
-    },
+  setup() {
+    // Router and route
+    const router = useRouter()
+    const route = useRoute()
     
-    formatDate(timestamp) {
+    // Reactive state
+    const user = ref(null)
+    const loading = ref(true)
+    const error = ref(null)
+    const dialogDelete = ref(false)
+    const showEditDialog = ref(false)
+
+    // Methods
+    const fetchUser = async () => {
+      loading.value = true
+      try {
+        const userId = route.params.id
+        const response = await apiClient.get(`/users/${userId}`)
+        user.value = response.data
+      } catch (err) {
+        error.value = 'Error loading user'
+        console.error(error.value, err)
+      } finally {
+        loading.value = false
+      }
+    }
+    
+    const formatDate = (timestamp) => {
       if (!timestamp) return 'N/A'
       
       const date = new Date(timestamp * 1000)
@@ -205,20 +207,37 @@ export default {
         hour: '2-digit',
         minute: '2-digit'
       }).format(date)
-    },
+    }
     
-    editUser() {
-      this.showEditDialog = true
-    },
+    const editUser = () => {
+      showEditDialog.value = true
+    }
     
-    async deleteUserConfirm() {
+    const deleteUserConfirm = async () => {
       try {
-        await apiClient.delete(`/users/${this.user._id}`)
-        this.$router.push({ name: 'Users' })
-      } catch (error) {
-        console.error('Error deleting user:', error)
+        await apiClient.delete(`/users/${user.value._id}`)
+        router.push({ name: 'Users' })
+      } catch (err) {
+        console.error('Error deleting user:', err)
       }
-      this.dialogDelete = false
+      dialogDelete.value = false
+    }
+    
+    // Lifecycle hooks
+    onMounted(fetchUser)
+    
+    // Expose to template
+    return {
+      user,
+      loading,
+      error,
+      dialogDelete,
+      showEditDialog,
+      fetchUser,
+      formatDate,
+      editUser,
+      deleteUserConfirm,
+      router
     }
   }
 }

@@ -202,18 +202,28 @@
 </template>
 
 <script>
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import apiClient from '../api/config'
 
 export default {
   name: 'UsersPage',
-  data: () => ({
-    search: '',
-    loading: false,
-    dialog: false,
-    dialogDelete: false,
-    dialogConfirmEdit: false,
-    editMode: false,
-    headers: [
+  setup() {
+    // Router and route
+    const router = useRouter()
+    const route = useRoute()
+    
+    // Reactive state
+    const search = ref('')
+    const loading = ref(false)
+    const dialog = ref(false)
+    const dialogDelete = ref(false)
+    const dialogConfirmEdit = ref(false)
+    const editMode = ref(false)
+    const users = ref([])
+    const editedIndex = ref(-1)
+    
+    const headers = [
       { title: 'Username', align: 'start', sortable: true, key: 'username' },
       { title: 'Roles', align: 'start', sortable: true, key: 'rolesAsString' },
       { title: 'Timezone', align: 'start', sortable: true, key: 'timezone' },
@@ -221,19 +231,9 @@ export default {
       { title: 'Last Updated At', align: 'start', sortable: true, key: 'updated_ts_formatted' },
       { title: 'Created At', align: 'start', sortable: true, key: 'created_ts_formatted' },
       { title: 'Actions', align: 'center', sortable: false, key: 'actions' }
-    ],
-    users: [],
-    editedIndex: -1,
-    editedItem: {
-      username: '',
-      password: '',
-      roles: [],
-      preferences: {
-        timezone: 'UTC'
-      },
-      active: true
-    },
-    defaultItem: {
+    ]
+    
+    const defaultItem = {
       username: '',
       password: '',
       roles: [],
@@ -242,47 +242,39 @@ export default {
       },
       active: true
     }
-  }),
-  
-  computed: {
-    formTitle() {
-      return this.editedIndex === -1 ? 'New User' : 'Edit User'
-    }
-  },
-  
-  mounted() {
-    this.fetchUsers()
-    // Check if we need to edit a user based on query param
-    if (this.$route.query.edit) {
-      this.editUserById(this.$route.query.edit)
-    }
-  },
-  
-  methods: {
-    async fetchUsers() {
-      this.loading = true
+    
+    const editedItem = reactive({...defaultItem})
+    
+    // Computed properties
+    const formTitle = computed(() => {
+      return editedIndex.value === -1 ? 'New User' : 'Edit User'
+    })
+    
+    // Methods
+    const fetchUsers = async () => {
+      loading.value = true
       try {
         const response = await apiClient.get('/users')
-        this.users = response.data.map(user => {
-          const preferences = user.preferences || { timezone: 'UTC' };
+        users.value = response.data.map(user => {
+          const preferences = user.preferences || { timezone: 'UTC' }
           return {
             ...user,
             rolesAsString: (user.roles || []).join(', '),
-            created_ts_formatted: this.formatDate(user.created_ts),
-            updated_ts_formatted: this.formatDate(user.updated_ts || user.created_ts),
+            created_ts_formatted: formatDate(user.created_ts),
+            updated_ts_formatted: formatDate(user.updated_ts || user.created_ts),
             timezone: preferences.timezone || 'UTC',
             preferences: preferences
           }
         })
-        console.log('Processed data:', this.users)
-      } catch (error) {
-        console.error('Error loading users:', error)
+        console.log('Processed data:', users.value)
+      } catch (err) {
+        console.error('Error loading users:', err)
       } finally {
-        this.loading = false
+        loading.value = false
       }
-    },
+    }
     
-    formatDate(timestamp) {
+    const formatDate = (timestamp) => {
       if (!timestamp) return 'N/A'
       
       const date = new Date(timestamp * 1000)
@@ -293,127 +285,164 @@ export default {
         hour: '2-digit',
         minute: '2-digit'
       }).format(date)
-    },
+    }
     
-    viewUser(item) {
-      this.$router.push({ name: 'UserDetails', params: { id: item._id } })
-    },
+    const viewUser = (item) => {
+      router.push({ name: 'UserDetails', params: { id: item._id } })
+    }
     
-    editUser(item) {
-      this.editedIndex = this.users.indexOf(item)
-      this.editedItem = Object.assign({}, item)
-      this.editMode = true
-      this.dialog = true
-    },
+    const editUser = (item) => {
+      editedIndex.value = users.value.indexOf(item)
+      Object.assign(editedItem, item)
+      editMode.value = true
+      dialog.value = true
+    }
     
-    deleteUser(item) {
-      this.editedIndex = this.users.indexOf(item)
-      this.editedItem = Object.assign({}, item)
-      this.dialogDelete = true
-    },
+    const deleteUser = (item) => {
+      editedIndex.value = users.value.indexOf(item)
+      Object.assign(editedItem, item)
+      dialogDelete.value = true
+    }
     
-    openNewUserDialog() {
-      this.editedItem = Object.assign({}, this.defaultItem)
-      this.editMode = false
-      this.dialog = true
-    },
+    const openNewUserDialog = () => {
+      Object.assign(editedItem, defaultItem)
+      editMode.value = false
+      dialog.value = true
+    }
     
-    async deleteItemConfirm() {
+    const deleteItemConfirm = async () => {
       try {
-        await apiClient.delete(`/users/${this.editedItem._id}`)
-        this.users.splice(this.editedIndex, 1)
-      } catch (error) {
-        console.error('Error deleting user:', error)
+        await apiClient.delete(`/users/${editedItem._id}`)
+        users.value.splice(editedIndex.value, 1)
+      } catch (err) {
+        console.error('Error deleting user:', err)
       }
-      this.closeDelete()
-    },
+      closeDelete()
+    }
     
-    async confirmEdit() {
-      await this.save()
-      this.dialogConfirmEdit = false
-    },
+    const confirmEdit = async () => {
+      await save()
+      dialogConfirmEdit.value = false
+    }
     
-    async save() {
-      if (this.editedIndex > -1) {
+    const save = async () => {
+      if (editedIndex.value > -1) {
         // Editing existing user
         try {
-          const response = await apiClient.put(`/users/${this.editedItem._id}`, this.editedItem)
+          const response = await apiClient.put(`/users/${editedItem._id}`, editedItem)
           // Add formatted fields to result
-          const userData = response.data;
-          const preferences = userData.preferences || { timezone: 'UTC' };
+          const userData = response.data
+          const preferences = userData.preferences || { timezone: 'UTC' }
           const updatedUser = {
             ...userData,
             rolesAsString: (userData.roles || []).join(', '),
-            created_ts_formatted: this.formatDate(userData.created_ts),
-            updated_ts_formatted: this.formatDate(userData.updated_ts || userData.created_ts),
+            created_ts_formatted: formatDate(userData.created_ts),
+            updated_ts_formatted: formatDate(userData.updated_ts || userData.created_ts),
             timezone: preferences.timezone || 'UTC',
             preferences: preferences
           }
-          Object.assign(this.users[this.editedIndex], updatedUser)
-        } catch (error) {
-          console.error('Error updating user:', error)
+          Object.assign(users.value[editedIndex.value], updatedUser)
+        } catch (err) {
+          console.error('Error updating user:', err)
         }
       } else {
         // Creating new user
         try {
-          const response = await apiClient.post('/users', this.editedItem)
+          const response = await apiClient.post('/users', editedItem)
           // Add formatted fields to result
-          const userData = response.data;
-          const preferences = userData.preferences || { timezone: 'UTC' };
+          const userData = response.data
+          const preferences = userData.preferences || { timezone: 'UTC' }
           const newUser = {
             ...userData,
             rolesAsString: (userData.roles || []).join(', '),
-            created_ts_formatted: this.formatDate(userData.created_ts),
-            updated_ts_formatted: this.formatDate(userData.updated_ts || userData.created_ts),
+            created_ts_formatted: formatDate(userData.created_ts),
+            updated_ts_formatted: formatDate(userData.updated_ts || userData.created_ts),
             timezone: preferences.timezone || 'UTC',
             preferences: preferences
           }
-          this.users.push(newUser)
-        } catch (error) {
-          console.error('Error creating user:', error)
+          users.value.push(newUser)
+        } catch (err) {
+          console.error('Error creating user:', err)
         }
       }
-      this.close()
-    },
+      close()
+    }
     
-    close() {
-      this.dialog = false
-      this.$nextTick(() => {
-        this.editedItem = Object.assign({}, this.defaultItem)
-        this.editedIndex = -1
+    const close = () => {
+      dialog.value = false
+      setTimeout(() => {
+        Object.assign(editedItem, defaultItem)
+        editedIndex.value = -1
       })
-    },
+    }
     
-    closeDelete() {
-      this.dialogDelete = false
-      this.$nextTick(() => {
-        this.editedItem = Object.assign({}, this.defaultItem)
-        this.editedIndex = -1
+    const closeDelete = () => {
+      dialogDelete.value = false
+      setTimeout(() => {
+        Object.assign(editedItem, defaultItem)
+        editedIndex.value = -1
       })
-    },
+    }
     
-    async editUserById(userId) {
+    const editUserById = async (userId) => {
       try {
         const response = await apiClient.get(`/users/${userId}`)
         const user = response.data
         
         // Add formatted fields to match the table format
-        const preferences = user.preferences || { timezone: 'UTC' };
+        const preferences = user.preferences || { timezone: 'UTC' }
         const formattedUser = {
           ...user,
           rolesAsString: (user.roles || []).join(', '),
-          created_ts_formatted: this.formatDate(user.created_ts),
-          updated_ts_formatted: this.formatDate(user.updated_ts || user.created_ts),
+          created_ts_formatted: formatDate(user.created_ts),
+          updated_ts_formatted: formatDate(user.updated_ts || user.created_ts),
           timezone: preferences.timezone || 'UTC',
           preferences: preferences
         }
         
-        this.editedItem = Object.assign({}, formattedUser)
-        this.editMode = true
-        this.dialog = true
-      } catch (error) {
-        console.error('Error loading user for edit:', error)
+        Object.assign(editedItem, formattedUser)
+        editMode.value = true
+        dialog.value = true
+      } catch (err) {
+        console.error('Error loading user for edit:', err)
       }
+    }
+    
+    // Lifecycle hooks and watchers
+    onMounted(() => {
+      fetchUsers()
+      // Check if we need to edit a user based on query param
+      if (route.query.edit) {
+        editUserById(route.query.edit)
+      }
+    })
+    
+    // Expose to template
+    return {
+      search,
+      loading,
+      dialog,
+      dialogDelete,
+      dialogConfirmEdit,
+      editMode,
+      headers,
+      users,
+      editedIndex,
+      editedItem,
+      defaultItem,
+      formTitle,
+      fetchUsers,
+      formatDate,
+      viewUser,
+      editUser,
+      deleteUser,
+      openNewUserDialog,
+      deleteItemConfirm,
+      confirmEdit,
+      save,
+      close,
+      closeDelete,
+      editUserById
     }
   }
 }

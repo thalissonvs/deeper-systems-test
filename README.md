@@ -197,7 +197,6 @@ This option requires installing all dependencies on your local machine.
 5. To serve the production build, you can use any web server:
    ```bash
    # Example using Python's http.server
-   cd dist
    python -m http.server 8080
    ```
 

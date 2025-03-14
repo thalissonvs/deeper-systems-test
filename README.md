@@ -126,8 +126,7 @@ This option requires installing all dependencies on your local machine.
 
 3. Install backend dependencies:
    ```bash
-   cd <repository-directory>
-   poetry config virtualenvs.create false  # Optional: use system Python
+   cd deeper-systems-test
    poetry install
    ```
 

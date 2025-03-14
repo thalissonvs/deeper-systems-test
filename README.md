@@ -74,8 +74,8 @@ This is the easiest method as it handles all dependencies automatically.
 
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
-   cd <repository-directory>
+   git clone https://github.com/thalissonvs/deeper-systems-test
+   cd deeper-systems-test
    ```
 
 2. Start the application:
@@ -126,8 +126,7 @@ This option requires installing all dependencies on your local machine.
 
 3. Install backend dependencies:
    ```bash
-   cd <repository-directory>
-   poetry config virtualenvs.create false  # Optional: use system Python
+   cd deeper-systems-test
    poetry install
    ```
 

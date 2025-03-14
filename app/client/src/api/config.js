@@ -1,6 +1,5 @@
 import axios from 'axios';
 
-// Define base URL for API requests
 const apiClient = axios.create({
   baseURL: '/api', // This will be proxied by Nginx to the backend service
   headers: {
